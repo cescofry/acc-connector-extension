@@ -73,6 +73,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.type) {
     case "uri":
       send({ action: "add", uri: msg.uri });
+      try { chrome.action.openPopup(); } catch (_) {}
       break;
     case "list":
       send({ action: "list" });
