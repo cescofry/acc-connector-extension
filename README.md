@@ -79,13 +79,6 @@ Run `acc-connector-setup --help` for details and per-browser paths.
 - Open the extension popup from the toolbar to manage servers and toggle discovery.
 - Use **+ Add Server** in the popup to add a server manually by hostname/IP, port, and optional name.
 
-## Extension icons
-
-The extension ships without custom icons (the browser shows its default). To add icons:
-
-1. Create PNG files at `src/extension/icons/icon16.png`, `icon48.png`, `icon128.png`
-2. Uncomment the `"icons"` block in both `src/extension/manifest.json` and `src/extension_firefox/manifest.json`
-
 ## Distribution
 
 | Method | Instructions |
