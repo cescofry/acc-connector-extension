@@ -27,10 +27,18 @@ header {
 }
 
 header h1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 600;
   color: #e94560;
   letter-spacing: 0.03em;
+}
+
+.title-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 #btn-toggle {

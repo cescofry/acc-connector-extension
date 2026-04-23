@@ -23,37 +23,50 @@ Native Host (Python)
 
 ## Installation
 
-### 1 — Install the native host
+### Quick install (Linux / macOS)
 
 ```bash
-cd extension/
+./install.sh
+# Then load the extension (see step 2 below) and copy the Extension ID, then:
+./install.sh --extension-id <YOUR_CHROME_EXTENSION_ID>
+```
+
+`install.sh` creates a dedicated venv at `~/.local/share/acc-connector/venv`, installs the package into it, and registers the native messaging manifests. No system-wide install or elevation needed. Firefox is registered automatically (no ID required); pass `--extension-id` only for Chrome.
+
+### Manual install
+
+#### 1 — Install the native host
+
+```bash
 pip install -e .
 ```
 
-### 2 — Load the extension in your browser
+#### 2 — Load the extension in your browser
 
 **Chrome / Chromium**
 1. Go to `chrome://extensions`
 2. Enable **Developer mode**
-3. Click **Load unpacked** → select the `extension/src/extension/` **directory**
+3. Click **Load unpacked** → select the `src/extension/` **directory**
 4. Copy the **Extension ID** shown on the card
 
 **Firefox**
 1. Go to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on**
-3. Select any file inside `extension/src/extension_firefox/` — Firefox uses that directory's `manifest.json`
-4. Copy the **Extension ID** shown
+3. Select any file inside `src/extension_firefox/` — Firefox uses that directory's `manifest.json`
 
 > **Why two directories?** Firefox's "Load Temporary Add-on" always reads `manifest.json` from whichever directory you pick. Chrome and Firefox require different `manifest.json` fields (`service_worker` vs `scripts`), so they each need their own directory. The JS/HTML/CSS files are identical in both.
 
-### 3 — Register the native messaging manifest
+#### 3 — Register the native messaging manifest
 
 ```bash
-# Linux / macOS
-acc-connector-setup --extension-id <YOUR_EXTENSION_ID>
+# Chrome only (Firefox is registered automatically via its stable gecko ID)
+acc-connector-setup --extension-id <YOUR_CHROME_EXTENSION_ID>
 
-# Windows (PowerShell)
-acc-connector-setup --extension-id <YOUR_EXTENSION_ID>
+# Firefox only
+acc-connector-setup --browser firefox
+
+# Both at once (Chrome + Firefox)
+acc-connector-setup --browser all --extension-id <YOUR_CHROME_EXTENSION_ID>
 ```
 
 This places a JSON manifest in the correct browser-specific directory and requires no elevation.
@@ -62,15 +75,16 @@ Run `acc-connector-setup --help` for details and per-browser paths.
 
 ## Usage
 
-- Click any `acc-connect://` link on a supported site — the extension intercepts it and adds the server automatically.
+- Click any `acc-connect://` link on a supported site — the extension intercepts it, adds the server automatically, and opens the popup so you can confirm it worked.
 - Open the extension popup from the toolbar to manage servers and toggle discovery.
+- Use **+ Add Server** in the popup to add a server manually by hostname/IP, port, and optional name.
 
 ## Extension icons
 
 The extension ships without custom icons (the browser shows its default). To add icons:
 
 1. Create PNG files at `src/extension/icons/icon16.png`, `icon48.png`, `icon128.png`
-2. Uncomment the `"icons"` block in both `manifest.json` and `manifest_firefox.json`
+2. Uncomment the `"icons"` block in both `src/extension/manifest.json` and `src/extension_firefox/manifest.json`
 
 ## Distribution
 
@@ -84,7 +98,6 @@ The extension ships without custom icons (the browser shows its default). To add
 ## Development
 
 ```bash
-cd extension/
 pip install -e ".[dev]"
 pytest
 ```
