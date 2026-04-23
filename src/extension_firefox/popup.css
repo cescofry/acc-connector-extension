@@ -1,0 +1,202 @@
+/* ------------------------------------------------------------------ */
+/* Reset & base                                                         */
+/* ------------------------------------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 340px;
+  min-width: 300px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+#app { display: flex; flex-direction: column; }
+
+/* ------------------------------------------------------------------ */
+/* Header                                                               */
+/* ------------------------------------------------------------------ */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+}
+
+header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e94560;
+  letter-spacing: 0.03em;
+}
+
+#btn-toggle {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #3a3a5c;
+  color: #aaa;
+  transition: background 0.15s, color 0.15s;
+}
+
+#btn-toggle.active {
+  background: #e94560;
+  color: #fff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Status bar                                                           */
+/* ------------------------------------------------------------------ */
+.status-bar {
+  padding: 5px 12px;
+  font-size: 11px;
+  color: #888;
+  background: #12122a;
+  border-bottom: 1px solid #0f3460;
+  min-height: 24px;
+}
+
+.status-bar.active { color: #4caf50; }
+.status-bar.error  { color: #e94560; }
+
+/* ------------------------------------------------------------------ */
+/* Server list                                                          */
+/* ------------------------------------------------------------------ */
+#server-list {
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+#server-list li.empty {
+  padding: 12px;
+  text-align: center;
+  color: #555;
+  font-style: italic;
+}
+
+.server-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid #1e1e3a;
+  gap: 8px;
+}
+
+.server-item:last-child { border-bottom: none; }
+
+.server-info { flex: 1; min-width: 0; }
+
+.server-name {
+  display: block;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.server-addr {
+  display: block;
+  font-size: 11px;
+  color: #777;
+  margin-top: 1px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #0f3460;
+  color: #7ec8e3;
+  margin-top: 2px;
+  vertical-align: middle;
+}
+
+.btn-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-remove:hover { color: #e94560; background: #2a1a2e; }
+
+/* ------------------------------------------------------------------ */
+/* Add section                                                          */
+/* ------------------------------------------------------------------ */
+#add-section {
+  border-top: 1px solid #0f3460;
+  padding: 8px 12px;
+}
+
+.btn-secondary {
+  background: none;
+  border: 1px solid #3a3a5c;
+  color: #aaa;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-secondary:hover { border-color: #7ec8e3; color: #e0e0e0; }
+
+#add-form { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+#add-form input[type="text"],
+#add-form input[type="number"] {
+  width: 100%;
+  padding: 5px 8px;
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#add-form input:focus { border-color: #7ec8e3; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row label { font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 4px; }
+.row input[type="number"] { width: 80px; }
+
+.form-actions { display: flex; gap: 6px; }
+
+.btn-primary {
+  flex: 1;
+  padding: 6px 12px;
+  background: #e94560;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover { background: #c73652; }

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "acc-connector-host"
+version = "1.0.0"
+description = "ACC Connector — Native Messaging Host for the browser extension"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+acc-connector-host = "native_host.host:main"
+acc-connector-setup = "native_host.setup:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src/native_host"]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/native_host"]

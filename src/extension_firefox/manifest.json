@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "ACC Connector",
+  "version": "1.0.0",
+  "description": "Intercepts acc-connect:// links and broadcasts server info via LAN discovery (UDP :8999) so ACC can find them.",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "acc-connector@acc-connector"
+    }
+  },
+
+  "permissions": ["nativeMessaging", "storage"],
+  "host_permissions": ["<all_urls>"],
+
+  "background": {
+    "scripts": ["background.js"]
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ACC Connector"
+  }
+}

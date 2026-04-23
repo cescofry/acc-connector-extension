@@ -1,0 +1,2 @@
+# no third-party runtime dependencies — stdlib only
+pytest>=7.0

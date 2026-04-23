@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACC Connector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>ACC Connector</h1>
+      <button id="btn-toggle">Discovery: OFF</button>
+    </header>
+
+    <div id="status-bar" class="status-bar">Connecting…</div>
+
+    <ul id="server-list"></ul>
+
+    <div id="add-section">
+      <button id="btn-add-toggle" class="btn-secondary">+ Add Server</button>
+
+      <form id="add-form" hidden>
+        <input id="input-name" type="text" placeholder="Server name (optional)" autocomplete="off">
+        <input id="input-host" type="text" placeholder="Hostname or IP" required autocomplete="off">
+        <div class="row">
+          <label for="input-port">Port</label>
+          <input id="input-port" type="number" value="9911" min="1" max="65535">
+        </div>
+        <div class="row">
+          <label>
+            <input id="input-persistent" type="checkbox" checked>
+            Save between sessions
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Add</button>
+          <button type="button" id="btn-cancel" class="btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
