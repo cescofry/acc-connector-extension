@@ -1,0 +1,50 @@
+name: Build, Sign & Release Firefox Extension
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install web-ext
+        run: npm install --global web-ext
+
+      - name: Sign extension
+        working-directory: src/extension_firefox
+        env:
+          AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
+          AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
+        run: |
+          web-ext sign \
+            --api-key="$AMO_API_KEY" \
+            --api-secret="$AMO_API_SECRET" \
+            --channel=unlisted
+
+      - name: Find signed XPI
+        id: find_xpi
+        working-directory: src/extension_firefox
+        run: |
+          XPI=$(find web-ext-artifacts -name "*.xpi" | head -1)
+          echo "path=src/extension_firefox/$XPI" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename $XPI)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "${{ steps.find_xpi.outputs.path }}" \
+            --title "ACC Connector ${{ github.ref_name }}" \
+            --notes "Install by clicking the .xpi file below. Firefox will prompt you to add the extension."
