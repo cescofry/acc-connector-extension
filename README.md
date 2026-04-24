@@ -49,12 +49,17 @@ pip install -e .
 3. Click **Load unpacked** → select the `src/extension/` **directory**
 4. Copy the **Extension ID** shown on the card
 
-**Firefox**
+**Firefox (signed — recommended)**
+1. Go to the [Releases page](https://github.com/cescofry/acc-connector-extension/releases/latest)
+2. Download the `.xpi` file
+3. Firefox will prompt you to install it
+
+**Firefox (unpacked — dev only)**
 1. Go to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on**
-3. Select any file inside `src/extension_firefox/` — Firefox uses that directory's `manifest.json`
+3. Select any file inside `src/extension_firefox/`
 
-> **Why two directories?** Firefox's "Load Temporary Add-on" always reads `manifest.json` from whichever directory you pick. Chrome and Firefox require different `manifest.json` fields (`service_worker` vs `scripts`), so they each need their own directory. The JS/HTML/CSS files are identical in both.
+> **Why two directories?** Chrome and Firefox require different `manifest.json` fields (`service_worker` vs `scripts`), so they each need their own directory. The JS/HTML/CSS files are identical in both.
 
 #### 3 — Register the native messaging manifest
 
@@ -84,9 +89,9 @@ Run `acc-connector-setup --help` for details and per-browser paths.
 | Method | Instructions |
 |--------|-------------|
 | Sideload (unpacked) | Load unpacked via Developer mode (Chrome) or `about:debugging` (Firefox) |
-| Firefox XPI | `web-ext build` → host the `.xpi` on any server |
+| Firefox XPI | Download the signed `.xpi` from the [Releases page](https://github.com/cescofry/acc-connector-extension/releases/latest) |
 | Chrome Web Store | Submit `src/extension/` as a ZIP; requires a $5 one-time fee |
-| Firefox AMO | Submit via `web-ext sign` or the AMO developer hub |
+| Firefox AMO | Signed automatically on each release tag via GitHub Actions (`web-ext sign`) |
 
 ## Development
 
