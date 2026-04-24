@@ -38,14 +38,22 @@ def _read_message_sync(stream=None) -> dict | None:
     """
     if stream is None:
         stream = sys.stdin.buffer
+    log.debug("_read_message_sync: waiting for 4-byte length prefix on %r", stream)
     raw_len = stream.read(4)
+    log.debug("_read_message_sync: got %d byte(s) for length prefix", len(raw_len))
     if len(raw_len) < 4:
+        log.warning("_read_message_sync: short read on length (%d bytes) — EOF or closed stdin", len(raw_len))
         return None
     msg_len = struct.unpack("<I", raw_len)[0]
+    log.debug("_read_message_sync: expecting %d byte(s) of payload", msg_len)
     data = stream.read(msg_len)
+    log.debug("_read_message_sync: got %d byte(s) of payload", len(data))
     if len(data) < msg_len:
+        log.warning("_read_message_sync: short read on payload (%d/%d bytes)", len(data), msg_len)
         return None
-    return json.loads(data.decode("utf-8"))
+    decoded = data.decode("utf-8")
+    log.debug("_read_message_sync: decoded payload: %s", decoded)
+    return json.loads(decoded)
 
 
 def _write_message(msg: dict, stream=None) -> None:
@@ -57,9 +65,11 @@ def _write_message(msg: dict, stream=None) -> None:
     if stream is None:
         stream = sys.stdout.buffer
     data = json.dumps(msg, separators=(",", ":")).encode("utf-8")
+    log.debug("_write_message: sending %d byte(s): %s", len(data), data[:500])
     stream.write(struct.pack("<I", len(data)))
     stream.write(data)
     stream.flush()
+    log.debug("_write_message: flushed")
 
 
 class NativeHost:
@@ -87,28 +97,39 @@ class NativeHost:
 
     async def handle(self, msg: dict) -> dict:
         action = msg.get("action")
+        log.debug("handle: action=%r full_msg=%r", action, msg)
 
         if action in ("list", "status"):
-            return self._state()
+            state = self._state()
+            log.debug("handle list/status: returning %r", state)
+            return state
 
         if action == "add":
             uri = msg.get("uri", "")
+            log.debug("handle add: uri=%r", uri)
             try:
                 srv = ServerInfo.from_uri(uri)
             except Exception as exc:
+                log.warning("handle add: invalid URI %r: %s", uri, exc)
                 return {"error": f"Invalid URI: {exc}"}
             if not srv.host:
+                log.warning("handle add: missing host in %r", uri)
                 return {"error": f"Invalid URI: missing host in {uri!r}"}
             if not self._has_server(srv.host, srv.port):
+                log.info("handle add: adding server %s:%d", srv.host, srv.port)
                 self._servers.append(srv)
                 self._discovery.servers = self._servers
                 if srv.persistent:
                     config.save_servers(self._servers)
+                    log.debug("handle add: saved persistent server")
+            else:
+                log.debug("handle add: server %s:%d already present", srv.host, srv.port)
             return self._state()
 
         if action == "remove":
             host = msg.get("host", "")
             port = int(msg.get("port", 0))
+            log.debug("handle remove: host=%r port=%d", host, port)
             before = len(self._servers)
             self._servers = [
                 s for s in self._servers
@@ -116,31 +137,42 @@ class NativeHost:
             ]
             self._discovery.servers = self._servers
             if len(self._servers) < before:
+                log.info("handle remove: removed %s:%d", host, port)
                 config.save_servers(self._servers)
+            else:
+                log.debug("handle remove: server %s:%d not found", host, port)
             return self._state()
 
         if action == "enable_discovery":
+            log.debug("handle enable_discovery")
             try:
                 await self._discovery.start()
             except OSError as exc:
+                log.error("handle enable_discovery: failed: %s", exc)
                 return {"error": str(exc)}
+            log.info("handle enable_discovery: started")
             return self._state()
 
         if action == "disable_discovery":
+            log.debug("handle disable_discovery")
             self._discovery.stop()
             return self._state()
 
         if action == "get_log":
             lines = msg.get("lines", 100)
+            log.debug("handle get_log: last %d lines from %s", lines, config.LOG_FILE)
             try:
                 text = config.LOG_FILE.read_text(errors="replace")
                 tail = "\n".join(text.splitlines()[-lines:])
             except FileNotFoundError:
+                log.warning("handle get_log: log file not found at %s", config.LOG_FILE)
                 tail = "(log file not found)"
             except Exception as exc:
+                log.error("handle get_log: error reading log: %s", exc)
                 tail = f"(error reading log: {exc})"
             return {"log": tail}
 
+        log.warning("handle: unknown action %r", action)
         return {"error": f"Unknown action: {action!r}"}
 
     # ------------------------------------------------------------------
@@ -170,7 +202,16 @@ class NativeHost:
 
 def main() -> None:
     config.setup_logging()
-    log.info("Native host starting (pid=%d)", __import__("os").getpid())
+    import os
+    log.info("=== Native host starting (pid=%d) ===", os.getpid())
+    log.info("sys.executable: %s", sys.executable)
+    log.info("sys.argv: %s", sys.argv)
+    log.info("stdin fd=%d isatty=%s", sys.stdin.fileno(), sys.stdin.isatty())
+    log.info("stdout fd=%d isatty=%s", sys.stdout.fileno(), sys.stdout.isatty())
+    log.info("stderr fd=%d isatty=%s", sys.stderr.fileno(), sys.stderr.isatty())
+    for key in ("FLATPAK_ID", "FLATPAK_SANDBOX_DIR", "DBUS_SESSION_BUS_ADDRESS",
+                "HOME", "USER", "PATH", "XDG_RUNTIME_DIR"):
+        log.info("env %s=%r", key, os.environ.get(key, "<not set>"))
     try:
         servers = config.load_servers()
         log.info("Loaded %d server(s) from config", len(servers))

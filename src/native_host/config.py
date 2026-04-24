@@ -27,14 +27,23 @@ def setup_logging() -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[logging.FileHandler(LOG_FILE)],
     )
+    log.debug("Logging initialised — log file: %s", LOG_FILE)
+    log.debug("Config dir: %s", CONFIG_DIR)
+    log.debug("Servers file: %s", SERVERS_FILE)
 
 
 def load_servers() -> list[ServerInfo]:
+    log.debug("load_servers: checking %s", SERVERS_FILE)
     if not SERVERS_FILE.exists():
+        log.debug("load_servers: file not found, returning empty list")
         return []
     try:
-        uris = json.loads(SERVERS_FILE.read_text())
-        return [ServerInfo.from_uri(u) for u in uris]
+        text = SERVERS_FILE.read_text()
+        log.debug("load_servers: raw content: %s", text)
+        uris = json.loads(text)
+        servers = [ServerInfo.from_uri(u) for u in uris]
+        log.debug("load_servers: loaded %d server(s): %r", len(servers), uris)
+        return servers
     except Exception:
         log.exception("Failed to load servers from %s", SERVERS_FILE)
         return []
@@ -44,4 +53,6 @@ def save_servers(servers: list[ServerInfo]) -> None:
     ensure_config_dir()
     persistent = [s for s in servers if s.persistent]
     uris = [s.to_uri() for s in persistent]
+    log.debug("save_servers: saving %d persistent server(s): %r", len(uris), uris)
     SERVERS_FILE.write_text(json.dumps(uris, indent=2))
+    log.debug("save_servers: written to %s", SERVERS_FILE)

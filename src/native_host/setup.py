@@ -55,10 +55,23 @@ def _is_flatpak_firefox_installed() -> bool:
 def _create_flatpak_wrapper(host_path: str) -> Path:
     # flatpak-spawn --host tunnels stdin/stdout back into the sandbox so
     # Firefox can talk to a host binary that lives outside its confinement.
+    # stderr is captured to a log file so failures from flatpak-spawn itself
+    # are visible even though the browser swallows the process's stderr.
     wrapper_dir = Path.home() / ".var" / "app" / FLATPAK_FIREFOX_APP_ID / "data" / "bin"
     wrapper_dir.mkdir(parents=True, exist_ok=True)
     wrapper = wrapper_dir / "acc-connector-wrapper.sh"
-    wrapper.write_text(f'#!/bin/sh\nexec flatpak-spawn --host "{host_path}" "$@"\n')
+    log_file = Path.home() / ".config" / "acc-connector" / "wrapper.log"
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        f'LOG="{log_file}"\n'
+        'echo "[$(date -Iseconds)] wrapper: invoked with args: $*" >> "$LOG" 2>&1\n'
+        'echo "[$(date -Iseconds)] wrapper: HOME=$HOME USER=$USER" >> "$LOG" 2>&1\n'
+        'echo "[$(date -Iseconds)] wrapper: FLATPAK_ID=$FLATPAK_ID" >> "$LOG" 2>&1\n'
+        'echo "[$(date -Iseconds)] wrapper: DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> "$LOG" 2>&1\n'
+        'echo "[$(date -Iseconds)] wrapper: which flatpak-spawn: $(which flatpak-spawn 2>&1)" >> "$LOG" 2>&1\n'
+        f'echo "[$(date -Iseconds)] wrapper: launching flatpak-spawn --host {host_path}" >> "$LOG" 2>&1\n'
+        f'exec flatpak-spawn --host "{host_path}" "$@" 2>> "$LOG"\n'
+    )
     wrapper.chmod(0o755)
     return wrapper
 
@@ -76,12 +89,23 @@ def _grant_flatpak_permissions() -> None:
     ]
     failed: list[str] = []
     for flags in overrides:
+        cmd = ["flatpak", "override", "--user", *flags, FLATPAK_FIREFOX_APP_ID]
+        print(f"  Running: {' '.join(cmd)}")
         try:
-            subprocess.run(
-                ["flatpak", "override", "--user", *flags, FLATPAK_FIREFOX_APP_ID],
-                check=True, capture_output=True, timeout=10,
+            result = subprocess.run(
+                cmd,
+                check=True, capture_output=True, text=True, timeout=10,
             )
+            if result.stdout:
+                print(f"    stdout: {result.stdout.strip()}")
+            if result.stderr:
+                print(f"    stderr: {result.stderr.strip()}")
         except subprocess.CalledProcessError as exc:
+            print(f"    FAILED (exit {exc.returncode})")
+            if exc.stdout:
+                print(f"    stdout: {exc.stdout.strip()}")
+            if exc.stderr:
+                print(f"    stderr: {exc.stderr.strip()}")
             failed.append(f"  flatpak override --user {' '.join(flags)} {FLATPAK_FIREFOX_APP_ID}  ({exc})")
     if failed:
         print("  Warning: could not apply some Flatpak overrides — run manually:")
@@ -89,6 +113,17 @@ def _grant_flatpak_permissions() -> None:
             print(line)
     else:
         print(f"  Flatpak permissions granted for {FLATPAK_FIREFOX_APP_ID}")
+    # Print current override state so we can verify.
+    try:
+        info = subprocess.run(
+            ["flatpak", "override", "--user", "--show", FLATPAK_FIREFOX_APP_ID],
+            capture_output=True, text=True, timeout=10,
+        )
+        print(f"  Current overrides for {FLATPAK_FIREFOX_APP_ID}:")
+        for line in (info.stdout + info.stderr).strip().splitlines():
+            print(f"    {line}")
+    except Exception as exc:
+        print(f"  (could not read current overrides: {exc})")
 
 
 def _chrome_manifest(host_path: str, extension_id: str) -> dict:
@@ -216,13 +251,19 @@ def main() -> None:
             Path.home() / ".var" / "app" / FLATPAK_FIREFOX_APP_ID
             / ".mozilla" / "native-messaging-hosts"
         )
-        if platform.system() == "Linux" and _is_flatpak_firefox_installed():
-            print("  Flatpak Firefox detected — setting up flatpak-spawn wrapper")
+        flatpak_detected = platform.system() == "Linux" and _is_flatpak_firefox_installed()
+        print(f"  Flatpak Firefox detected: {flatpak_detected}")
+        if flatpak_detected:
+            print("  Setting up flatpak-spawn wrapper")
             wrapper_path = _create_flatpak_wrapper(host_path)
-            print(f"  Wrapper: {wrapper_path}")
+            print(f"  Wrapper path: {wrapper_path}")
+            print(f"  Wrapper content:")
+            for line in wrapper_path.read_text().splitlines():
+                print(f"    {line}")
             _grant_flatpak_permissions()
             for d in _firefox_dirs():
                 effective = str(wrapper_path) if d == flatpak_dir else host_path
+                print(f"  Manifest for {d}: path -> {effective}")
                 _install_manifest(d, _firefox_manifest(effective))
         else:
             for d in _firefox_dirs():
