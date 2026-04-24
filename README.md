@@ -78,17 +78,7 @@ This places a JSON manifest in the correct browser-specific directory and requir
 
 Run `acc-connector-setup --help` for details and per-browser paths.
 
-#### Linux — Flatpak and Snap browsers
-
-On Linux, browsers can be installed in several ways, each with a different native messaging manifest location. `acc-connector-setup` writes to all of them unconditionally, so whichever installation method you use will be covered:
-
-| Install method | Firefox path | Chrome / Chromium path |
-|---|---|---|
-| System package (apt, dnf, pacman, …) | `~/.mozilla/native-messaging-hosts/` | `~/.config/google-chrome/NativeMessagingHosts/` |
-| Flatpak | `~/.var/app/org.mozilla.firefox/.mozilla/native-messaging-hosts/` | `~/.var/app/com.google.Chrome/.config/google-chrome/NativeMessagingHosts/` |
-| Snap | `~/snap/firefox/common/.mozilla/native-messaging-hosts/` | `~/snap/chromium/common/.config/chromium/NativeMessagingHosts/` |
-
-Writing to unused paths is harmless — each browser only reads from its own location.
+> **Flatpak Firefox users**: native messaging is not currently supported in Flatpak-sandboxed Firefox due to an architectural sandbox restriction. See `Documentation/flatpak-firefox-native-messaging.md` for the full investigation and workarounds.
 
 ## Usage
 

@@ -14,6 +14,7 @@ import argparse
 import json
 import platform
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,6 +23,7 @@ HOST_NAME = "com.acc_connector.host"
 # Firefox native messaging uses allowed_extensions with this string ID —
 # no random UUID needed.
 FIREFOX_GECKO_ID = "acc-connector@acc-connector"
+FLATPAK_FIREFOX_APP_ID = "org.mozilla.firefox"
 
 
 def _host_executable() -> str:
@@ -35,6 +37,44 @@ def _host_executable() -> str:
     if found:
         return found
     sys.exit("Error: acc-connector-host not found. Run: pip install -e . inside your venv.")
+
+
+def _is_flatpak_firefox_installed() -> bool:
+    if shutil.which("flatpak") is None:
+        return False
+    try:
+        result = subprocess.run(
+            ["flatpak", "list", "--app", "--columns=application"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return FLATPAK_FIREFOX_APP_ID in result.stdout
+    except Exception:
+        return False
+
+
+def _create_flatpak_wrapper(host_path: str) -> Path:
+    # flatpak-spawn --host tunnels stdin/stdout back into the sandbox so
+    # Firefox can talk to a host binary that lives outside its confinement.
+    wrapper_dir = Path.home() / ".var" / "app" / FLATPAK_FIREFOX_APP_ID / "data" / "bin"
+    wrapper_dir.mkdir(parents=True, exist_ok=True)
+    wrapper = wrapper_dir / "acc-connector-wrapper.sh"
+    wrapper.write_text(f'#!/bin/bash\nexec flatpak-spawn --host "{host_path}" "$@"\n')
+    wrapper.chmod(0o755)
+    return wrapper
+
+
+def _grant_flatpak_session_bus() -> None:
+    # flatpak-spawn requires the session D-Bus socket; without this override
+    # Firefox cannot reach the Flatpak portal to launch host-side processes.
+    try:
+        subprocess.run(
+            ["flatpak", "override", "--user", "--socket=session-bus", FLATPAK_FIREFOX_APP_ID],
+            check=True, capture_output=True, timeout=10,
+        )
+        print(f"  Granted session-bus socket access to {FLATPAK_FIREFOX_APP_ID}")
+    except subprocess.CalledProcessError as exc:
+        print(f"  Warning: could not grant session-bus access ({exc})")
+        print(f"  Run manually: flatpak override --user --socket=session-bus {FLATPAK_FIREFOX_APP_ID}")
 
 
 def _chrome_manifest(host_path: str, extension_id: str) -> dict:
@@ -158,8 +198,21 @@ def main() -> None:
 
     if args.browser in ("firefox", "all"):
         print(f"Firefox (gecko ID: {FIREFOX_GECKO_ID}):")
-        for d in _firefox_dirs():
-            _install_manifest(d, _firefox_manifest(host_path))
+        flatpak_dir = (
+            Path.home() / ".var" / "app" / FLATPAK_FIREFOX_APP_ID
+            / ".mozilla" / "native-messaging-hosts"
+        )
+        if platform.system() == "Linux" and _is_flatpak_firefox_installed():
+            print("  Flatpak Firefox detected — setting up flatpak-spawn wrapper")
+            wrapper_path = _create_flatpak_wrapper(host_path)
+            print(f"  Wrapper: {wrapper_path}")
+            _grant_flatpak_session_bus()
+            for d in _firefox_dirs():
+                effective = str(wrapper_path) if d == flatpak_dir else host_path
+                _install_manifest(d, _firefox_manifest(effective))
+        else:
+            for d in _firefox_dirs():
+                _install_manifest(d, _firefox_manifest(host_path))
 
     print()
     print("Done. Reload your extension if it is already open.")

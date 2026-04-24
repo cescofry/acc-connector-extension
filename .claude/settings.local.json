@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s https://api.github.com/repos/flatpak/xdg-native-messaging-proxy/releases)",
+      "Bash(python3 -c \"import json,sys; releases=json.load\\(sys.stdin\\); [print\\(r['tag_name'], r['published_at'], r['name']\\) for r in releases]\")"
+    ]
+  }
+}
