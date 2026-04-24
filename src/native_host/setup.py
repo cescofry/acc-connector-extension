@@ -64,6 +64,7 @@ def _create_flatpak_wrapper(host_path: str) -> Path:
     wrapper.write_text(
         "#!/bin/sh\n"
         f'LOG="{log_file}"\n'
+        'mkdir -p "$(dirname "$LOG")"\n'
         'echo "[$(date -Iseconds)] wrapper: invoked with args: $*" >> "$LOG" 2>&1\n'
         'echo "[$(date -Iseconds)] wrapper: HOME=$HOME USER=$USER" >> "$LOG" 2>&1\n'
         'echo "[$(date -Iseconds)] wrapper: FLATPAK_ID=$FLATPAK_ID" >> "$LOG" 2>&1\n'
