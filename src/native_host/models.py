@@ -35,6 +35,7 @@ class ServerInfo:
             + bytes([name_len])
             + name_utf32
             + RESPONSE_CONST
+            + ip_bytes
             + struct.pack("!H", self.port)
             + struct.pack("<I", discovery_id)
             + RESPONSE_FOOTER

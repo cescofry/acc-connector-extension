@@ -144,14 +144,17 @@ class TestToPacket:
         name_len = len(name)
         name_end = 2 + name_len * 4
         const_end = name_end + 2
-        port_end = const_end + 2
+        ip_end = const_end + 4
+        port_end = ip_end + 2
         id_end = port_end + 4
         return {
             "name_start": 2,
             "name_end": name_end,
             "const_start": name_end,
             "const_end": const_end,
-            "port_start": const_end,
+            "ip_start": const_end,
+            "ip_end": ip_end,
+            "port_start": ip_end,
             "port_end": port_end,
             "id_start": port_end,
             "id_end": id_end,
@@ -212,8 +215,15 @@ class TestToPacket:
     def test_total_packet_length(self):
         name = "Test"
         pkt = ServerInfo(host="127.0.0.1", port=9911, name=name).to_packet(1)
-        # 1 header + 1 name_len + 4*len(name) name_utf32 + 2 const + 2 port + 4 id + 1 footer
-        assert len(pkt) == 1 + 1 + len(name) * 4 + 2 + 2 + 4 + 1
+        # 1 header + 1 name_len + 4*len(name) name_utf32 + 2 const + 4 ip + 2 port + 4 id + 1 footer
+        assert len(pkt) == 1 + 1 + len(name) * 4 + 2 + 4 + 2 + 4 + 1
+
+    def test_ip_after_const(self):
+        name = "T"
+        pkt = ServerInfo(host="127.0.0.1", port=9911, name=name).to_packet(1)
+        off = self._offsets(name)
+        import socket as _socket
+        assert pkt[off["ip_start"]:off["ip_end"]] == _socket.inet_aton("127.0.0.1")
 
     def test_discovery_id_zero(self):
         name = "T"
