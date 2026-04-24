@@ -58,30 +58,20 @@ def _firefox_manifest(host_path: str) -> dict:
     }
 
 
-def _flatpak_installed(app_id: str) -> bool:
-    """Return True if a Flatpak app is installed (user or system)."""
-    flatpak_var = Path.home() / ".var" / "app" / app_id
-    return flatpak_var.exists()
-
-
 def _chrome_dirs() -> list[Path]:
     os_name = platform.system()
     home = Path.home()
     if os_name == "Linux":
-        dirs = [
+        return [
             home / ".config" / "google-chrome" / "NativeMessagingHosts",
             home / ".config" / "chromium" / "NativeMessagingHosts",
+            # Flatpak (user or system install).
+            home / ".var" / "app" / "com.google.Chrome" / ".config" / "google-chrome" / "NativeMessagingHosts",
+            home / ".var" / "app" / "com.google.ChromeDev" / ".config" / "google-chrome" / "NativeMessagingHosts",
+            home / ".var" / "app" / "org.chromium.Chromium" / ".config" / "chromium" / "NativeMessagingHosts",
+            # Snap (Ubuntu and derivatives).
+            home / "snap" / "chromium" / "common" / ".config" / "chromium" / "NativeMessagingHosts",
         ]
-        # Flatpak Chrome/Chromium look in their own sandbox data dirs.
-        flatpak_browsers = {
-            "com.google.Chrome": home / ".var" / "app" / "com.google.Chrome" / ".config" / "google-chrome" / "NativeMessagingHosts",
-            "com.google.ChromeDev": home / ".var" / "app" / "com.google.ChromeDev" / ".config" / "google-chrome" / "NativeMessagingHosts",
-            "org.chromium.Chromium": home / ".var" / "app" / "org.chromium.Chromium" / ".config" / "chromium" / "NativeMessagingHosts",
-        }
-        for app_id, path in flatpak_browsers.items():
-            if _flatpak_installed(app_id):
-                dirs.append(path)
-        return dirs
     if os_name == "Darwin":
         return [
             home / "Library" / "Application Support" / "Google" / "Chrome" / "NativeMessagingHosts",
@@ -96,11 +86,13 @@ def _firefox_dirs() -> list[Path]:
     os_name = platform.system()
     home = Path.home()
     if os_name == "Linux":
-        dirs = [home / ".mozilla" / "native-messaging-hosts"]
-        # Flatpak Firefox looks in its own sandbox data dir.
-        if _flatpak_installed("org.mozilla.firefox"):
-            dirs.append(home / ".var" / "app" / "org.mozilla.firefox" / ".mozilla" / "native-messaging-hosts")
-        return dirs
+        return [
+            home / ".mozilla" / "native-messaging-hosts",
+            # Flatpak (user or system install).
+            home / ".var" / "app" / "org.mozilla.firefox" / ".mozilla" / "native-messaging-hosts",
+            # Snap (Ubuntu and derivatives).
+            home / "snap" / "firefox" / "common" / ".mozilla" / "native-messaging-hosts",
+        ]
     if os_name == "Darwin":
         return [home / "Library" / "Application Support" / "Mozilla" / "NativeMessagingHosts"]
     if os_name == "Windows":
