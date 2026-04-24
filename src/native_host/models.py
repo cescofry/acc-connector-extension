@@ -27,13 +27,13 @@ class ServerInfo:
 
     def to_packet(self, discovery_id: int) -> bytes:
         name = (self.name or f"{self.host}:{self.port}")[:MAX_NAME_LEN]
-        name_utf32 = name.encode("utf-32-le")
+        name_utf16 = name.encode("utf-16-le")
         name_len = len(name)
         ip_bytes = socket.inet_aton(self.resolve_ip())
         return (
             RESPONSE_HEADER
             + bytes([name_len])
-            + name_utf32
+            + name_utf16
             + RESPONSE_CONST
             + ip_bytes
             + struct.pack("!H", self.port)
