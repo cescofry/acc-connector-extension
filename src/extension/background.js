@@ -27,6 +27,10 @@ function connect() {
   }
 
   port.onMessage.addListener((msg) => {
+    if (msg.log !== undefined) {
+      console.debug("[ACC] host.log:\n" + msg.log);
+      return;
+    }
     saveState({ connected: true, error: null, ...msg });
   });
 
@@ -37,8 +41,9 @@ function connect() {
     saveState({ connected: false, error: err });
   });
 
-  // Fetch initial server list and restore discovery if it was running before.
+  // Fetch initial server list, request log for debugging, and restore discovery.
   port.postMessage({ action: "list" });
+  port.postMessage({ action: "get_log" });
   chrome.storage.local.get(["discoveryEnabled"], ({ discoveryEnabled }) => {
     if (discoveryEnabled && port) {
       port.postMessage({ action: "enable_discovery" });

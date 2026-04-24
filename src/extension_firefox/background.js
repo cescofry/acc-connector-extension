@@ -27,18 +27,24 @@ function connect() {
   }
 
   port.onMessage.addListener((msg) => {
+    if (msg.log !== undefined) {
+      console.debug("[ACC] host.log:\n" + msg.log);
+      return;
+    }
     saveState({ connected: true, error: null, ...msg });
   });
 
   port.onDisconnect.addListener(() => {
-    const err = chrome.runtime.lastError?.message ?? "Native host disconnected";
-    console.warn("[ACC] Native host disconnected:", err);
+    const lastErr = chrome.runtime.lastError;
+    const err = lastErr?.message ?? "Native host disconnected (no lastError)";
+    console.warn("[ACC] Native host disconnected. lastError:", lastErr, "message:", err);
     port = null;
     saveState({ connected: false, error: err });
   });
 
-  // Fetch initial server list and restore discovery if it was running before.
+  // Fetch initial server list, request log for debugging, and restore discovery.
   port.postMessage({ action: "list" });
+  port.postMessage({ action: "get_log" });
   chrome.storage.local.get(["discoveryEnabled"], ({ discoveryEnabled }) => {
     if (discoveryEnabled && port) {
       port.postMessage({ action: "enable_discovery" });

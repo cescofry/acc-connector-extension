@@ -130,6 +130,17 @@ class NativeHost:
             self._discovery.stop()
             return self._state()
 
+        if action == "get_log":
+            lines = msg.get("lines", 100)
+            try:
+                text = config.LOG_FILE.read_text(errors="replace")
+                tail = "\n".join(text.splitlines()[-lines:])
+            except FileNotFoundError:
+                tail = "(log file not found)"
+            except Exception as exc:
+                tail = f"(error reading log: {exc})"
+            return {"log": tail}
+
         return {"error": f"Unknown action: {action!r}"}
 
     # ------------------------------------------------------------------
@@ -137,25 +148,37 @@ class NativeHost:
     # ------------------------------------------------------------------
 
     async def run(self) -> None:
+        log.info("Native host run loop started")
         loop = asyncio.get_running_loop()
         try:
             while True:
                 msg = await loop.run_in_executor(None, _read_message_sync)
                 if msg is None:
+                    log.info("Native host stdin closed — exiting")
                     break
                 log.debug("Received: %s", msg)
                 response = await self.handle(msg)
                 log.debug("Sending: %s", response)
                 _write_message(response)
+        except Exception:
+            log.exception("Unhandled error in run loop")
+            raise
         finally:
             self._discovery.stop()
+            log.info("Native host stopped")
 
 
 def main() -> None:
     config.setup_logging()
-    servers = config.load_servers()
-    host = NativeHost(servers)
-    asyncio.run(host.run())
+    log.info("Native host starting (pid=%d)", __import__("os").getpid())
+    try:
+        servers = config.load_servers()
+        log.info("Loaded %d server(s) from config", len(servers))
+        host = NativeHost(servers)
+        asyncio.run(host.run())
+    except Exception:
+        log.exception("Fatal error in native host")
+        raise
 
 
 if __name__ == "__main__":
