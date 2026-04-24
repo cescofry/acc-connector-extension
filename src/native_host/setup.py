@@ -58,23 +58,37 @@ def _create_flatpak_wrapper(host_path: str) -> Path:
     wrapper_dir = Path.home() / ".var" / "app" / FLATPAK_FIREFOX_APP_ID / "data" / "bin"
     wrapper_dir.mkdir(parents=True, exist_ok=True)
     wrapper = wrapper_dir / "acc-connector-wrapper.sh"
-    wrapper.write_text(f'#!/bin/bash\nexec flatpak-spawn --host "{host_path}" "$@"\n')
+    wrapper.write_text(f'#!/bin/sh\nexec flatpak-spawn --host "{host_path}" "$@"\n')
     wrapper.chmod(0o755)
     return wrapper
 
 
-def _grant_flatpak_session_bus() -> None:
-    # flatpak-spawn requires the session D-Bus socket; without this override
-    # Firefox cannot reach the Flatpak portal to launch host-side processes.
-    try:
-        subprocess.run(
-            ["flatpak", "override", "--user", "--socket=session-bus", FLATPAK_FIREFOX_APP_ID],
-            check=True, capture_output=True, timeout=10,
-        )
-        print(f"  Granted session-bus socket access to {FLATPAK_FIREFOX_APP_ID}")
-    except subprocess.CalledProcessError as exc:
-        print(f"  Warning: could not grant session-bus access ({exc})")
-        print(f"  Run manually: flatpak override --user --socket=session-bus {FLATPAK_FIREFOX_APP_ID}")
+def _grant_flatpak_permissions() -> None:
+    # flatpak-spawn --host requires two permissions:
+    # 1. session-bus socket — so the process inside the sandbox can reach D-Bus at all.
+    # 2. talk-name=org.freedesktop.Flatpak — the actual service flatpak-spawn calls to
+    #    ask the host to spawn a process outside the sandbox.  Without this the call
+    #    fails with "ServiceUnknown: --host only works when the Flatpak is allowed to
+    #    talk to org.freedesktop.Flatpak".
+    overrides = [
+        ["--socket=session-bus"],
+        ["--talk-name=org.freedesktop.Flatpak"],
+    ]
+    failed: list[str] = []
+    for flags in overrides:
+        try:
+            subprocess.run(
+                ["flatpak", "override", "--user", *flags, FLATPAK_FIREFOX_APP_ID],
+                check=True, capture_output=True, timeout=10,
+            )
+        except subprocess.CalledProcessError as exc:
+            failed.append(f"  flatpak override --user {' '.join(flags)} {FLATPAK_FIREFOX_APP_ID}  ({exc})")
+    if failed:
+        print("  Warning: could not apply some Flatpak overrides — run manually:")
+        for line in failed:
+            print(line)
+    else:
+        print(f"  Flatpak permissions granted for {FLATPAK_FIREFOX_APP_ID}")
 
 
 def _chrome_manifest(host_path: str, extension_id: str) -> dict:
@@ -206,7 +220,7 @@ def main() -> None:
             print("  Flatpak Firefox detected — setting up flatpak-spawn wrapper")
             wrapper_path = _create_flatpak_wrapper(host_path)
             print(f"  Wrapper: {wrapper_path}")
-            _grant_flatpak_session_bus()
+            _grant_flatpak_permissions()
             for d in _firefox_dirs():
                 effective = str(wrapper_path) if d == flatpak_dir else host_path
                 _install_manifest(d, _firefox_manifest(effective))

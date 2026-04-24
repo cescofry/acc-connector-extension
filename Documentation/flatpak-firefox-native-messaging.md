@@ -146,8 +146,10 @@ chmod +x ~/.var/app/org.mozilla.firefox/data/bin/acc-connector-wrapper.sh
 
 2. Grant Firefox session bus access (required for `flatpak-spawn`):
 ```bash
-flatpak override --socket=session-bus org.mozilla.firefox
+flatpak override --user --socket=session-bus org.mozilla.firefox
+flatpak override --user --talk-name=org.freedesktop.Flatpak org.mozilla.firefox
 ```
+`--socket=session-bus` alone is not sufficient — `--talk-name=org.freedesktop.Flatpak` is also required. Without it `flatpak-spawn --host` fails immediately with "ServiceUnknown: --host only works when the Flatpak is allowed to talk to org.freedesktop.Flatpak".
 
 3. Update the manifest to point to the wrapper instead of the Python binary directly. Either manually edit `~/.var/app/org.mozilla.firefox/.mozilla/native-messaging-hosts/com.acc_connector.host.json` and set `"path"` to the wrapper path, or extend `acc-connector-setup` to generate a wrapper automatically when Flatpak Firefox is detected.
 
