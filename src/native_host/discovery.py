@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import pathlib
 import socket
+import subprocess
 
 try:
     from native_host.models import ServerInfo, parse_discovery_request
@@ -11,6 +13,33 @@ except ImportError:
 
 DISCOVERY_PORT = 8999
 log = logging.getLogger(__name__)
+
+_HERE = pathlib.Path(__file__).resolve().parent
+
+
+def _locate_raw_send() -> pathlib.Path:
+    for candidate in (_HERE / "raw_send", _HERE.parent / "raw_send",
+                      _HERE.parent.parent / "raw_send"):
+        if candidate.is_file():
+            return candidate
+    return pathlib.Path("raw_send")
+
+
+def _send_spoofed(srv: ServerInfo, discovery_id: int, addr: tuple[str, int]) -> None:
+    binary = _locate_raw_send()
+    subprocess.run(
+        [
+            str(binary),
+            srv.resolve_ip(),
+            str(srv.port),
+            srv.display_name(),
+            str(discovery_id),
+            addr[0],
+            str(addr[1]),
+        ],
+        check=True,
+        timeout=2,
+    )
 
 
 class DiscoveryProtocol(asyncio.DatagramProtocol):
@@ -31,8 +60,7 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
         log.debug("Discovery request from %s id=%d", addr, discovery_id)
         for srv in self._server.servers:
             try:
-                pkt = srv.to_packet(discovery_id)
-                self.transport.sendto(pkt, addr)
+                _send_spoofed(srv, discovery_id, addr)
                 log.debug("Sent response for %s to %s", srv.display_name(), addr)
             except Exception:
                 log.exception("Failed to send response for %s", srv.display_name())

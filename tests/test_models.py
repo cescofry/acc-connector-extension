@@ -142,19 +142,16 @@ class TestResolveIp:
 class TestToPacket:
     def _offsets(self, name: str) -> dict:
         name_len = len(name)
-        name_end = 2 + name_len * 2  # UTF-16-LE: 2 bytes per char
+        name_end = 2 + name_len * 4  # UTF-32-LE: 4 bytes per char
         const_end = name_end + 2
-        ip_end = const_end + 4
-        port_end = ip_end + 2
+        port_end = const_end + 2
         id_end = port_end + 4
         return {
             "name_start": 2,
             "name_end": name_end,
             "const_start": name_end,
             "const_end": const_end,
-            "ip_start": const_end,
-            "ip_end": ip_end,
-            "port_start": ip_end,
+            "port_start": const_end,
             "port_end": port_end,
             "id_start": port_end,
             "id_end": id_end,
@@ -174,11 +171,11 @@ class TestToPacket:
         pkt = ServerInfo(host="127.0.0.1", port=9911, name=name).to_packet(1)
         assert pkt[1] == len(name)
 
-    def test_name_encoded_utf16le(self):
+    def test_name_encoded_utf32le(self):
         name = "ABC"
         pkt = ServerInfo(host="127.0.0.1", port=9911, name=name).to_packet(1)
         off = self._offsets(name)
-        assert pkt[off["name_start"]:off["name_end"]] == name.encode("utf-16-le")
+        assert pkt[off["name_start"]:off["name_end"]] == name.encode("utf-32-le")
 
     def test_response_const_after_name(self):
         name = "X"
@@ -205,7 +202,7 @@ class TestToPacket:
         pkt = srv.to_packet(1)
         fallback = "127.0.0.1:9911"
         assert pkt[1] == len(fallback)
-        assert pkt[2 : 2 + len(fallback) * 2] == fallback.encode("utf-16-le")
+        assert pkt[2 : 2 + len(fallback) * 4] == fallback.encode("utf-32-le")
 
     def test_name_truncated_to_max_len(self):
         long_name = "A" * (MAX_NAME_LEN + 10)
@@ -215,15 +212,8 @@ class TestToPacket:
     def test_total_packet_length(self):
         name = "Test"
         pkt = ServerInfo(host="127.0.0.1", port=9911, name=name).to_packet(1)
-        # 1 header + 1 name_len + 2*len(name) name_utf16 + 2 const + 4 ip + 2 port + 4 id + 1 footer
-        assert len(pkt) == 1 + 1 + len(name) * 2 + 2 + 4 + 2 + 4 + 1
-
-    def test_ip_after_const(self):
-        name = "T"
-        pkt = ServerInfo(host="127.0.0.1", port=9911, name=name).to_packet(1)
-        off = self._offsets(name)
-        import socket as _socket
-        assert pkt[off["ip_start"]:off["ip_end"]] == _socket.inet_aton("127.0.0.1")
+        # 1 header + 1 name_len + 4*len(name) name_utf32 + 2 const + 2 port + 4 id + 1 footer
+        assert len(pkt) == 1 + 1 + len(name) * 4 + 2 + 2 + 4 + 1
 
     def test_discovery_id_zero(self):
         name = "T"

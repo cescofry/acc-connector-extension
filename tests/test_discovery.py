@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import socket
 import struct
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+import discovery
 from discovery import DiscoveryProtocol, DiscoveryServer
 from models import DISCOVERY_MAGIC, ServerInfo
 
@@ -86,69 +87,74 @@ class TestDiscoveryProtocolConnectionMade:
 
 class TestDiscoveryProtocolDatagramReceived:
     def test_ignores_invalid_magic(self):
-        protocol, transport = _make_protocol()
-        protocol.datagram_received(b"\x00\x00\x00\x00\x00\x00", ("127.0.0.1", 12345))
-        transport.sendto.assert_not_called()
+        protocol, _ = _make_protocol()
+        with patch.object(discovery, "_send_spoofed") as mock_send:
+            protocol.datagram_received(b"\x00\x00\x00\x00\x00\x00", ("127.0.0.1", 12345))
+            mock_send.assert_not_called()
 
     def test_ignores_too_short_packet(self):
-        protocol, transport = _make_protocol()
-        protocol.datagram_received(DISCOVERY_MAGIC, ("127.0.0.1", 12345))
-        transport.sendto.assert_not_called()
+        protocol, _ = _make_protocol()
+        with patch.object(discovery, "_send_spoofed") as mock_send:
+            protocol.datagram_received(DISCOVERY_MAGIC, ("127.0.0.1", 12345))
+            mock_send.assert_not_called()
 
     def test_ignores_too_long_packet(self):
-        protocol, transport = _make_protocol()
-        protocol.datagram_received(_make_request(1) + b"\x00", ("127.0.0.1", 12345))
-        transport.sendto.assert_not_called()
+        protocol, _ = _make_protocol()
+        with patch.object(discovery, "_send_spoofed") as mock_send:
+            protocol.datagram_received(_make_request(1) + b"\x00", ("127.0.0.1", 12345))
+            mock_send.assert_not_called()
 
     def test_no_servers_sends_nothing(self):
-        protocol, transport = _make_protocol(servers=[])
-        protocol.datagram_received(_make_request(1), ("127.0.0.1", 54321))
-        transport.sendto.assert_not_called()
+        protocol, _ = _make_protocol(servers=[])
+        with patch.object(discovery, "_send_spoofed") as mock_send:
+            protocol.datagram_received(_make_request(1), ("127.0.0.1", 54321))
+            mock_send.assert_not_called()
 
     def test_sends_one_packet_per_server(self):
         servers = [
             ServerInfo(host="127.0.0.1", port=9911, name="A"),
             ServerInfo(host="127.0.0.1", port=9912, name="B"),
         ]
-        protocol, transport = _make_protocol(servers)
-        protocol.datagram_received(_make_request(42), ("127.0.0.1", 54321))
-        assert transport.sendto.call_count == 2
+        protocol, _ = _make_protocol(servers)
+        with patch.object(discovery, "_send_spoofed") as mock_send:
+            protocol.datagram_received(_make_request(42), ("127.0.0.1", 54321))
+            assert mock_send.call_count == 2
 
     def test_sends_to_originating_address(self):
         servers = [ServerInfo(host="127.0.0.1", port=9911, name="Test")]
-        protocol, transport = _make_protocol(servers)
+        protocol, _ = _make_protocol(servers)
         addr = ("192.168.1.100", 54321)
-        protocol.datagram_received(_make_request(1), addr)
-        _, sent_addr = transport.sendto.call_args[0]
-        assert sent_addr == addr
+        with patch.object(discovery, "_send_spoofed") as mock_send:
+            protocol.datagram_received(_make_request(1), addr)
+            _, called_addr = mock_send.call_args[0][1], mock_send.call_args[0][2]
+            assert called_addr == addr
 
-    def test_sent_packet_contains_discovery_id(self):
+    def test_passes_discovery_id_to_raw_send(self):
         discovery_id = 0xABCD1234
         servers = [ServerInfo(host="127.0.0.1", port=9911, name="T")]
-        protocol, transport = _make_protocol(servers)
-        protocol.datagram_received(_make_request(discovery_id), ("127.0.0.1", 54321))
-        sent_pkt, _ = transport.sendto.call_args[0]
-        # discovery_id is 4 bytes LE near the end: footer is last, id before that
-        id_bytes = sent_pkt[-5:-1]
-        assert struct.unpack("<I", id_bytes)[0] == discovery_id
+        protocol, _ = _make_protocol(servers)
+        with patch.object(discovery, "_send_spoofed") as mock_send:
+            protocol.datagram_received(_make_request(discovery_id), ("127.0.0.1", 54321))
+            called_id = mock_send.call_args[0][1]
+            assert called_id == discovery_id
 
-    def test_handles_sendto_error_without_raising(self):
+    def test_handles_send_error_without_raising(self):
         servers = [ServerInfo(host="127.0.0.1", port=9911, name="Test")]
-        protocol, transport = _make_protocol(servers)
-        transport.sendto.side_effect = OSError("Network error")
-        # must not propagate the exception
-        protocol.datagram_received(_make_request(1), ("127.0.0.1", 54321))
+        protocol, _ = _make_protocol(servers)
+        with patch.object(discovery, "_send_spoofed", side_effect=OSError("Network error")):
+            # must not propagate the exception
+            protocol.datagram_received(_make_request(1), ("127.0.0.1", 54321))
 
     def test_continues_after_one_server_fails(self):
         servers = [
             ServerInfo(host="127.0.0.1", port=9911, name="Good1"),
             ServerInfo(host="127.0.0.1", port=9912, name="Good2"),
         ]
-        protocol, transport = _make_protocol(servers)
-        # fail only on first call
-        transport.sendto.side_effect = [OSError("fail"), None]
-        protocol.datagram_received(_make_request(1), ("127.0.0.1", 54321))
-        assert transport.sendto.call_count == 2
+        protocol, _ = _make_protocol(servers)
+        with patch.object(discovery, "_send_spoofed",
+                          side_effect=[OSError("fail"), None]) as mock_send:
+            protocol.datagram_received(_make_request(1), ("127.0.0.1", 54321))
+            assert mock_send.call_count == 2
 
 
 class TestDiscoveryProtocolErrorReceived:
