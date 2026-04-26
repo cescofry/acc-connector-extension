@@ -16,10 +16,18 @@ log = logging.getLogger(__name__)
 
 _HERE = pathlib.Path(__file__).resolve().parent
 
+# Well-known install locations for the raw_send binary, checked in order.
+_RAW_SEND_CANDIDATES = [
+    _HERE / "raw_send",
+    _HERE.parent / "raw_send",
+    _HERE.parent.parent / "raw_send",
+    pathlib.Path.home() / ".local" / "share" / "acc-connector" / "raw_send",
+    pathlib.Path.home() / ".local" / "bin" / "acc-connector-raw-send",
+]
+
 
 def _locate_raw_send() -> pathlib.Path:
-    for candidate in (_HERE / "raw_send", _HERE.parent / "raw_send",
-                      _HERE.parent.parent / "raw_send"):
+    for candidate in _RAW_SEND_CANDIDATES:
         if candidate.is_file():
             return candidate
     return pathlib.Path("raw_send")
@@ -27,7 +35,11 @@ def _locate_raw_send() -> pathlib.Path:
 
 def _send_spoofed(srv: ServerInfo, discovery_id: int, addr: tuple[str, int]) -> None:
     binary = _locate_raw_send()
-    subprocess.run(
+    log.debug(
+        "raw_send: binary=%s server=%s:%d dest=%s:%d id=%d",
+        binary, srv.resolve_ip(), srv.port, addr[0], addr[1], discovery_id,
+    )
+    result = subprocess.run(
         [
             str(binary),
             srv.resolve_ip(),
@@ -39,7 +51,10 @@ def _send_spoofed(srv: ServerInfo, discovery_id: int, addr: tuple[str, int]) -> 
         ],
         check=True,
         timeout=2,
+        capture_output=True,
     )
+    if result.stderr:
+        log.warning("raw_send stderr: %s", result.stderr.decode(errors="replace").strip())
 
 
 class DiscoveryProtocol(asyncio.DatagramProtocol):
@@ -57,7 +72,10 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
         discovery_id = parse_discovery_request(data)
         if discovery_id is None:
             return
-        log.debug("Discovery request from %s id=%d", addr, discovery_id)
+        log.info(
+            "Discovery request from %s port=%d id=%d servers=%d",
+            addr[0], addr[1], discovery_id, len(self._server.servers),
+        )
         for srv in self._server.servers:
             try:
                 _send_spoofed(srv, discovery_id, addr)
@@ -85,12 +103,15 @@ class DiscoveryServer:
     async def start(self) -> None:
         if self._running:
             return
+        raw_send_path = _locate_raw_send()
+        log.info("raw_send binary resolved to: %s (exists=%s)", raw_send_path, raw_send_path.is_file())
         loop = asyncio.get_running_loop()
         try:
             transport, _ = await loop.create_datagram_endpoint(
                 lambda: DiscoveryProtocol(self),
                 local_addr=("0.0.0.0", DISCOVERY_PORT),
                 allow_broadcast=True,
+                reuse_address=True,
             )
             self._transport = transport
             self._running = True

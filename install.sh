@@ -55,3 +55,27 @@ else
     echo "Or re-run this script:"
     echo "  ./install.sh --extension-id <YOUR_EXTENSION_ID>"
 fi
+
+# ------------------------------------------------------------------ raw_send (Linux only)
+if [[ "$(uname -s)" == "Linux" && -f "${SCRIPT_DIR}/raw_send.c" ]]; then
+    RAW_SEND_DIR="${HOME}/.local/share/acc-connector"
+    RAW_SEND_BIN="${RAW_SEND_DIR}/raw_send"
+    mkdir -p "${RAW_SEND_DIR}"
+    echo ""
+    echo "Building raw_send (IP-spoof helper for LAN discovery)…"
+    if gcc -O2 -o "${RAW_SEND_BIN}" "${SCRIPT_DIR}/raw_send.c"; then
+        echo "  Built: ${RAW_SEND_BIN}"
+        echo ""
+        echo "  Setting CAP_NET_RAW capability (requires sudo)…"
+        if sudo setcap cap_net_raw+ep "${RAW_SEND_BIN}"; then
+            echo "  OK: cap_net_raw set on ${RAW_SEND_BIN}"
+        else
+            echo "  WARNING: setcap failed — run manually:"
+            echo "    sudo setcap cap_net_raw+ep ${RAW_SEND_BIN}"
+            echo "  LAN discovery will not work without this step."
+        fi
+    else
+        echo "  ERROR: gcc failed — install gcc and re-run this script."
+        echo "  LAN discovery will not work without raw_send."
+    fi
+fi

@@ -6,7 +6,11 @@
       "Bash(python *)",
       "Bash(curl *)",
       "Bash(python3 *)",
-      "Bash(python3.13 *)"
+      "Bash(python3.13 *)",
+      "Bash(.venv/bin/python -m pytest tests/ -q)",
+      "Bash(pip install *)",
+      "Bash(pip3 show *)",
+      "Bash(pip3.14 show *)"
     ]
   }
 }
